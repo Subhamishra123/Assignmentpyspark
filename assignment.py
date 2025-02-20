@@ -7,6 +7,7 @@ from pyspark.sql.window import Window
 def create_spark_obj():
     spark=SparkSession.builder.appName("spark-assignment").master("local").getOrCreate()
     sparkcontext=spark.sparkContext
+    sparkcontext.setLogLevel("ERROR")
     return spark
 
 if __name__=="__main__":
@@ -90,8 +91,22 @@ if __name__=="__main__":
     print("================================")
     sales_df.show()
     menu_df.show()
-    sales_df.groupBy("customer_id","product_id1").agg(count("product_id1")).orderBy("customer_id").show()
+    sales_df=sales_df.groupBy("customer_id","product_id1").agg(count("product_id1").alias("count_product1")).orderBy("customer_id")
+    sales_df.show()
+
+    max_count_product=sales_df.groupBy("customer_id").agg(max("count_product1").alias("max_count_pid")).orderBy("customer_id").withColumnRenamed("customer_id","customer_id1")
+    max_count_product.show()
+    join_check=sales_df.join(max_count_product,\
+                             on=((max_count_product['max_count_pid']==sales_df['count_product1']) &
+                                 (max_count_product['customer_id1']==sales_df['customer_id'])),\
+                             ).select("customer_id","product_id1","count_product1").orderBy("customer_id")
+    join_check.show()
+
+    final_join=join_check.join(menu_df,on=(menu_df['product_id']==join_check['product_id1'])).orderBy("customer_id")
+    final_join.drop("product_id1","price").show()
     #5) Which item was the most popular for each customer?
+    #6) Which item was ordered first by the customer after becoming a restaurant member?
+
     """
     sales_df=sales_df.withColumn("unique_id",monotonically_increasing_id())
     sales_df.show()
