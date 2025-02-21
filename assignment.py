@@ -32,6 +32,7 @@ if __name__=="__main__":
     ]
     sales_cols = ["customer_id", "order_date", "product_id"]
     sales_df=spark.createDataFrame(sales_data,sales_cols)
+    sales_df2 = spark.createDataFrame(sales_data, sales_cols)
     #sales_df.show()
     # menu data
     menu_data = [('1', 'palak_paneer', 100),
@@ -106,7 +107,13 @@ if __name__=="__main__":
     final_join.drop("product_id1","price").show()
     #5) Which item was the most popular for each customer?
     #6) Which item was ordered first by the customer after becoming a restaurant member?
-
+    print("=========================")
+    sales_df2.show()
+    members_df.show()
+    join_sales_members=members_df.join(sales_df2,\
+                                       on=((members_df['customer_id']==sales_df2['customer_id']) &
+                                           (members_df['join_date']<=sales_df2['order_date'])))
+    join_sales_members.show()
     """
     sales_df=sales_df.withColumn("unique_id",monotonically_increasing_id())
     sales_df.show()
