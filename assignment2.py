@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, sum, count, rank, monotonically_increasing_id, countDistinct
+from pyspark.sql.functions import col, sum, when, rank, monotonically_increasing_id, countDistinct
 from pyspark.sql.window import Window
 
 
@@ -97,3 +97,60 @@ if __name__=="__main__":
     join_data=join_data.join(menu_df,on=(join_data['product_id']==menu_df['product_id1']))
     join_data = join_data.groupBy("customer_id").agg(sum("price").alias("amount_spent"),countDistinct("product_id").alias("total_items")).orderBy("customer_id")
     join_data.show()
+
+    #9) If each rupee spent equates to 10 points and item ‘jeera_rice’ has a 2x points multiplier, find out how many points each customer would have.
+    print("==============")
+    menu_df.show()
+    menu_df=menu_df.withColumnRenamed("product_id1","product_id")
+    menu_df=menu_df.withColumn("new_price",when(menu_df['product_id']==3,menu_df['price']*20).otherwise(menu_df['price']*10))
+    menu_df.show()
+    #new_df=menu_df.join()
+    sales_df=sales_df.withColumnRenamed('product_id','product_id1')
+    sales_df.show()
+    print("==================")
+    nes_df=sales_df.join(menu_df,on=(menu_df['product_id']==sales_df['product_id1']),how='inner').drop('product_id1')
+    nes_df.show()
+    nes_df.groupBy('customer_id').agg(sum('new_price').alias("rewards_points")).drop('order_date','product_name','price','product_id').orderBy("customer_id").show()
+    #10) Create the complete table with all data and columns like customer_id, order_date, product_name, price, and member(Y/N).
+    print("=====================")
+    sales_df.show()
+    menu_df.show()
+    members_df.show()
+
+    #11) Create the complete table with all data and columns like customer_id, order_date, product_name, price, and member(Y/N).
+    full_table=sales_df.join(menu_df,on=(sales_df['product_id1']==menu_df['product_id']),how='inner')
+    full_table=full_table.drop('product_id1','new_price')
+    print('+++++++++++')
+    pivot_table=full_table.join(members_df,
+                    on=(members_df['customer_id1']==full_table['customer_id']),how='full')
+    print("pivot_table")
+    pivot_table.show()
+    pivot_table.\
+        withColumn("is_Member",
+                   when(pivot_table['order_date']>=pivot_table['join_date'],'yes').\
+                       when(pivot_table['order_date']<pivot_table['join_date'],'no').\
+                   otherwise('no')).\
+                    drop('customer_id1','product_id','join_date').\
+                    orderBy('customer_id','order_date').\
+                    show()
+
+    #12Question 11:- We also require further information about the ranking of customer products.
+    # The owner does not need the ranking for non-member purchases,
+    # so he expects null ranking values for the records when customers still need to be part of
+    # the membership program.
+    print("======================")
+    sales_df.show()
+    menu_df.show()
+    members_df.show()
+    ranking_final_df = sales_df.join(menu_df, on=(sales_df['product_id1']==menu_df['product_id']), how='left')
+    ranking_final_df=ranking_final_df.join(members_df, on=(members_df['customer_id1']==ranking_final_df['customer_id']), how='left')
+    ranking_final_df.withColumn('is_member', when(col('order_date') < col('join_date'), 'N')
+                .when(col('order_date') >= col('join_date'), 'Y')
+                .otherwise('N')).\
+    withColumn('rank', when(col('is_member') == 'N', None)
+                .when(col('is_member') == 'Y', rank().over(Window.partitionBy('customer_id', 'is_member')
+                                                           .orderBy('order_date'))).\
+                otherwise(0)).show()
+
+
+
